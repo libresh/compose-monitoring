@@ -1,0 +1,65 @@
+version: '2'
+services:
+  cadvisor:
+    image: google/cadvisor
+    volumes:
+    - "/:/rootfs:ro"
+    - "/var/run:/var/run:rw"
+    - "/sys:/sys:ro"
+    - "/var/lib/docker/:/var/lib/docker:ro"
+    networks:
+    - back
+  nodeexporter:
+    image: prom/node-exporter
+    networks:
+    - back
+  prometheus:
+    image: prom/prometheus
+    volumes:
+    - ./storage/prometheus:/prometheus
+    - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    - ./prometheus/rules:/etc/prometheus
+    command:
+    - "-config.file=/etc/prometheus/prometheus.yml"
+    - "-storage.local.path=/prometheus"
+    - "-web.console.libraries=/etc/prometheus/console_libraries"
+    - "-web.console.templates=/etc/prometheus/consoles"
+    - "-web.listen-address=:9090"
+    - "-alertmanager.url=http://alertmanager:9093"
+    networks:
+    - back
+  alertmanager:
+    image: prom/alertmanager
+    volumes:
+    - ./alertmanager/:/etc/alertmanager/
+    - ./storage/alertmanager/:/alertmanager
+    command:
+    - '-config.file=/etc/alertmanager/config.yml'
+    - '-storage.path=/alertmanager'
+    networks:
+    - back
+  grafana:
+    image: grafana/grafana
+    volumes:
+    - ./storage/grafana:/var/lib/grafana
+    environment:
+    - GF_SECURITY_ADMIN_USER=admin
+    - GF_SECURITY_ADMIN_PASSWORD=admin
+    - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+    - back
+  web:
+    image: nginx
+    volumes:
+    - ./htpasswd:/etc/nginx/htpasswd
+    - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    environment:
+    - VIRTUAL_HOST=cadvisor.${HOSTNAME},grafana.${HOSTNAME},prometheus.${HOSTNAME}
+    networks:
+    - back
+    - lb_web
+networks:
+  back:
+    driver: bridge
+  lb_web:
+    external: true
