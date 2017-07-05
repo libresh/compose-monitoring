@@ -1,2 +1,3 @@
 htpasswd
 .env
+prometheus.yaml
